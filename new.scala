@@ -47,46 +47,51 @@ class MarketInf(underPrice:Double,rate:Double,div:Double,vol:Double){
   var vol_ = vol
 }
 
-class EOption(strike:Double,t:Double,opType:Int,bid:Double,ask:Double,market:MarketInf){
+//option features
+case class EOption(strike:Double,t:Double,opType:Int,bid:Double,ask:Double,market:MarketInf){
   var s_ = market.underPrice_
   var r = market.rate_
   var d_ = market.div_
   var sigma_ = market.vol_
   var d1_ = ( log(1/(strike/s_)) + (r-d_ + pow(sigma_,2)/2)*t ) / ( sigma_ * sqrt(t) )
   var d2_ = d1_ - sigma_ * sqrt(t)
-
-
+  var strike_ = strike
   def price(): Double = {
       return opType*(s_ * normCdf(opType*d1_)*exp(-t*d_) - strike*exp(-t*r)*normCdf(opType*d2_))
   }
   def vega(): Double = {
       return normPdf(d1_)*sqrt(t)*s_
   }
-  def calculateImpliedVol(mkPrice:Double,init:Double = 0.1,tol:Double = 0.001):Double = {
-  var imVol = init
-  var diff: Double = 1
-  var e:Double = 1
-  //optim using newton method
-  while(e>tol){
-    d1_ = ( log(1/(strike/s_)) + (r-d_ + pow(imVol,2)/2)*t ) / ( imVol * sqrt(t) )
-    d2_ = d1_ - imVol * sqrt(t)
-    diff = price() - mkPrice
-    e = abs(diff)
-    imVol = imVol - diff/vega()
+
+  def findImVol(mkPrice:Double,init:Double = 0.2,tol:Double = 0.0001):Double = {
+    var imVol = init
+    var diff: Double = 1
+    var e:Double = 1
+    //optim using newton method
+    while(e>tol){
+      d1_ = ( log(1/(strike/s_)) + (r-d_ + pow(imVol,2)/2)*t ) / ( imVol * sqrt(t) )
+      d2_ = d1_ - imVol * sqrt(t)
+      diff = price() - mkPrice
+      e = abs(diff)
+      imVol = imVol - diff/vega()
+    }
+    
+    return imVol
   }
-    
-  return imVol
+  def bidVol:Double = findImVol(bid)
+  def askVol:Double = findImVol(ask)
 
 }
-    
-  def bidVol():Double = calculateImpliedVol(bid)
-  def askvol():Double = calculateImpliedVol(ask)
 
-}
 val market1 = new MarketInf(300,rate = 0.03,div = 0.02,0.3)
 
-//val calls = List(EOption(295,0.5,CALL,4.18,4.2,market1),EOption(297.5,0.5,CALL,1.85,1.87,market1),EOption(300,0.5,CALL,0.38,0.39,market1))//,EOption(302.5,0.5,CALL,0.03,0.04,market1))
+//result
 
-//val puts = List(EOption(295,0.5,PUT,0.03,0.04,market1),EOption(297.5,0.5,PUT,0.19,0.2,market1),EOption(300,0.5,PUT,1.22,1.24,market1),EOption(302.5,0.5,PUT,3.36,3.38,market1))
-val option1 = EOption(295,0.5,CALL,4.18,4.2,market1)
+val calls = List(EOption(295,0.02,CALL,6.07,6.12,market1),EOption(297.5,0.02,PUT,4.49,4.45,market1),EOption(300,0.02,PUT,3.18,3.20,market1),EOption(302.5,0.02,CALL,2.2,2.21,market1))
+
+val puts = List(EOption(295,0.02,PUT,2.14,2.15,market1),EOption(297.5,0.02,PUT,3.04,3.05,market1),EOption(300,0.02,PUT,4.23,4.25,market1),EOption(302.5,0.02,PUT,5.72,5.76,market1))
+
+calls.foreach{call => println(call.strike_ + " calls imVol = " + call.bidVol + " | " + call.askVol)}
+puts.foreach{put => println(put.strike_ + " puts bid ask = " + put.bidVol + " | " + put.askVol)}
+
 }
